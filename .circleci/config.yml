@@ -1,0 +1,57 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: circleci/node:8
+    steps:
+      - checkout
+      - restore_cache:
+          key: node-v1-{{ checksum "package-lock.json" }}
+      - run:
+          name: Install JS dependencies
+          command: |
+            npm install
+      - save_cache:
+          key: node-v1-{{ checksum "package-lock.json" }}
+          paths:
+            - node_modules
+      - run:
+          name: Install mocha-junit-reporter
+          command: |
+            # Used to output results in JUnit format for CircleCI
+            npm install mocha-junit-reporter
+      - run:
+          name: run tests
+          command: |
+            mkdir -p test-results/mocha
+            node_modules/.bin/mocha --reporter mocha-junit-reporter --reporter-options mochaFile=test-results/mocha/test-results.xml
+      - store_test_results:
+          path: test-results
+      - store_artifacts:
+          path: test-results
+  build-image:
+    docker:
+      - image: circleci/node:8
+    environment:
+      - DOCKER_IMAGE_NAME: myapp
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Build image
+          command: |
+            docker build -t $DOCKER_IMAGE_NAME .
+      - run:
+          name: Test image
+          command: |
+            docker run -d -p 8080:8080 --name built-image $DOCKER_IMAGE_NAME
+            sleep 10
+            docker run --network container:built-image appropriate/curl --retry 10 --retry-connrefused http://localhost:8080 | grep "Hello World!"
+workflows:
+  version: 2
+  build-workflow:
+    jobs:
+      - build
+      - build-image:
+          requires:
+            - build
