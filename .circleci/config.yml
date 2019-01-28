@@ -45,7 +45,7 @@ jobs:
           name: Run container
           command: |
             docker run -d -p 8080:8080 --name built-image $DOCKER_IMAGE_NAME
-     - run:
+      - run:
           name: Test container
           command: |
             sleep 10
